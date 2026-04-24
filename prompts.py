@@ -119,17 +119,44 @@ class PromptTemplates:
 
 
     @staticmethod
+    def tavily_reddit_analysis_system() -> str:
+        """System prompt for analyzing Tavily Reddit search results."""
+        return """
+        You are an expert analyzing social media discussions. Analyze the provided Reddit content retrieved via Tavily web search to extract community insights and user experiences.
+
+        Focus on:
+        - Real user experiences and testimonials
+        - Community consensus and popular opinions
+        - Practical tips and advice from users
+        - Different perspectives and debates
+
+        IMPORTANT: When referencing specific content, directly quote it and mention the subreddit or context.
+        Highlight both positive and negative experiences, controversies, and varying opinions.
+        """
+
+    @staticmethod
+    def tavily_reddit_analysis_user(user_question: str, tavily_reddit_results: str) -> str:
+        """User prompt for analyzing Tavily Reddit search results."""
+        return f"""
+        Question: {user_question}
+
+        Tavily Reddit Search Results: {tavily_reddit_results}
+
+        Please analyze these Reddit results from Tavily and extract community insights, user experiences, and relevant discussions.
+        """
+
+    @staticmethod
     def synthesis_system() -> str:
         """System prompt for synthesizing all analyses."""
         return """
         You are an expert research synthesizer. Combine the provided analyses from different sources to create a comprehensive, well-structured answer.
         
         Your task:
-        - Synthesize insights from Google, Bing, and Reddit analyses
+        - Synthesize insights from Google, Bing, Reddit, and Tavily Reddit analyses
         - Identify common themes and conflicting information
         - Present a balanced view incorporating different perspectives
         - Structure the response logically with clear sections
-        - Cite the source type (Google, Bing, and Reddit) for key claims
+        - Cite the source type (Google, Bing, Reddit, and Tavily Reddit) for key claims
         - Highlight any contradictions or uncertainties
         
         Create a comprehensive answer that addresses the user's question from multiple angles.
@@ -141,17 +168,20 @@ class PromptTemplates:
                        google_analysis: str,
                        bing_analysis: str,
                        reddit_analysis: str,
+                       tavily_reddit_analysis: str = "",
                        ) -> str:
         """User prompt for synthesizing all analyses."""
         return f"""
         Question: {user_question}
-        
+
         Google Analysis: {google_analysis}
-        
+
         Bing Analysis: {bing_analysis}
-        
+
         Reddit Community Analysis: {reddit_analysis}
-        
+
+        Tavily Reddit Analysis: {tavily_reddit_analysis}
+
         Please synthesize these analyses into a comprehensive answer that addresses the question from multiple perspectives.
         """
 
@@ -220,13 +250,25 @@ def get_reddit_analysis_messages(
     )
 
 
+def get_tavily_reddit_analysis_messages(
+        user_question: str, tavily_reddit_results: str
+) -> list[Dict[str, Any]]:
+    """Get messages for Tavily Reddit results analysis."""
+    return create_message_pair(
+        PromptTemplates.tavily_reddit_analysis_system(),
+        PromptTemplates.tavily_reddit_analysis_user(user_question, tavily_reddit_results),
+    )
+
+
 def get_synthesis_messages(
-        user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str
+        user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str,
+        tavily_reddit_analysis: str = "",
 ) -> list[Dict[str, Any]]:
     """Get messages for final synthesis."""
     return create_message_pair(
         PromptTemplates.synthesis_system(),
         PromptTemplates.synthesis_user(
-            user_question, google_analysis, bing_analysis, reddit_analysis
+            user_question, google_analysis, bing_analysis, reddit_analysis,
+            tavily_reddit_analysis,
         ),
     )

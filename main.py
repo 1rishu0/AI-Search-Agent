@@ -38,6 +38,8 @@ class State(TypedDict):
     google_analysis: str | None
     bing_analysis: str | None
     reddit_analysis: str | None
+    tavily_reddit_results: str | None
+    tavily_reddit_analysis: str | None
     final_answer: str | None
 
 
@@ -160,6 +162,27 @@ def analyze_reddit_results(state: State):
     return {"reddit_analysis": reply.content}
 
 
+def tavily_reddit_search_node(state: State):
+    user_question = state.get("user_question", "")
+    print(f"Searching Reddit via Tavily for: {user_question}")
+
+    tavily_reddit_results = tavily_reddit_search(user_question)
+
+    return {"tavily_reddit_results": tavily_reddit_results}
+
+
+def analyze_tavily_reddit_results(state: State):
+    print("Analyzing Tavily Reddit search results")
+
+    user_question = state.get("user_question", "")
+    tavily_reddit_results = state.get("tavily_reddit_results", "")
+
+    messages = get_tavily_reddit_analysis_messages(user_question, str(tavily_reddit_results))
+    reply = llm.invoke(messages)
+
+    return {"tavily_reddit_analysis": reply.content}
+
+
 def synthesize_analyses(state: State):
     print("Combine all results together")
 
@@ -167,8 +190,9 @@ def synthesize_analyses(state: State):
     google_analysis = state.get("google_analysis", "")
     bing_analysis = state.get("bing_analysis", "")
     reddit_analysis = state.get("reddit_analysis", "")
+    tavily_reddit_analysis = state.get("tavily_reddit_analysis", "")
 
-    messages = get_synthesis_messages(user_question, google_analysis, bing_analysis, reddit_analysis)
+    messages = get_synthesis_messages(user_question, google_analysis, bing_analysis, reddit_analysis, tavily_reddit_analysis)
     reply = llm.invoke(messages)
     final_answer = reply.content
 
@@ -185,11 +209,14 @@ graph_builder.add_node("retrieve_reddit_posts", retrieve_reddit_posts)
 graph_builder.add_node("analyze_google_results", analyze_google_results)
 graph_builder.add_node("analyze_bing_results", analyze_bing_results)
 graph_builder.add_node("analyze_reddit_results", analyze_reddit_results)
+graph_builder.add_node("tavily_reddit_search", tavily_reddit_search_node)
+graph_builder.add_node("analyze_tavily_reddit_results", analyze_tavily_reddit_results)
 graph_builder.add_node("synthesize_analyses", synthesize_analyses)
 
 graph_builder.add_edge(START, "google_search")
 graph_builder.add_edge(START, "bing_search")
 graph_builder.add_edge(START, "reddit_search")
+graph_builder.add_edge(START, "tavily_reddit_search")
 
 graph_builder.add_edge("google_search", "analyze_reddit_posts")
 graph_builder.add_edge("bing_search", "analyze_reddit_posts")
@@ -204,6 +231,9 @@ graph_builder.add_edge("retrieve_reddit_posts", "analyze_reddit_results")
 graph_builder.add_edge("analyze_google_results", "synthesize_analyses")
 graph_builder.add_edge("analyze_bing_results", "synthesize_analyses")
 graph_builder.add_edge("analyze_reddit_results", "synthesize_analyses")
+
+graph_builder.add_edge("tavily_reddit_search", "analyze_tavily_reddit_results")
+graph_builder.add_edge("analyze_tavily_reddit_results", "synthesize_analyses")
 
 graph_builder.add_edge("synthesize_analyses", END)
 
@@ -232,11 +262,13 @@ def run_chatbot():
             "google_analysis": None,
             "bing_analysis": None,
             "reddit_analysis": None,
+            "tavily_reddit_results": None,
+            "tavily_reddit_analysis": None,
             "final_answer": None,
         }
 
         print("\nStarting Parallel research process...")
-        print("Launching Google, Bing, and Reddit searches...\n")
+        print("Launching Google, Bing, Reddit, and Tavily Reddit searches...\n")
 
         final_state = graph.invoke(state)
 
