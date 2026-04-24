@@ -6,6 +6,7 @@ import os
 import requests
 from urllib.parse import quote_plus
 from snapshot_operations import download_snapshot, poll_snapshot_status
+from tavily import TavilyClient
 
 load_dotenv()
 
@@ -169,3 +170,30 @@ def reddit_post_retrieval(urls, days_back=10, load_all_replies=False, comment_li
         parsed_comments.append(parsed_comment)
 
     return {"comments": parsed_comments, "total_retrieved": len(parsed_comments)}
+
+
+def tavily_reddit_search(query, max_results=10):
+    """Search Reddit via Tavily with include_domains=['reddit.com']."""
+    try:
+        client = TavilyClient()
+        response = client.search(
+            query=query,
+            max_results=max_results,
+            search_depth="advanced",
+            include_domains=["reddit.com"],
+        )
+
+        parsed_data = []
+        for result in response.get("results", []):
+            parsed_post = {
+                "title": result.get("title"),
+                "url": result.get("url"),
+                "content": result.get("content", ""),
+            }
+            parsed_data.append(parsed_post)
+
+        return {"parsed_posts": parsed_data, "total_found": len(parsed_data)}
+
+    except Exception as e:
+        print(f"Tavily Reddit search failed: {e}")
+        return None
