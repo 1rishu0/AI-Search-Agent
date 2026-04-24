@@ -6,6 +6,7 @@ import os
 import requests
 from urllib.parse import quote_plus
 from snapshot_operations import download_snapshot, poll_snapshot_status
+from tavily import TavilyClient
 
 load_dotenv()
 
@@ -169,3 +170,36 @@ def reddit_post_retrieval(urls, days_back=10, load_all_replies=False, comment_li
         parsed_comments.append(parsed_comment)
 
     return {"comments": parsed_comments, "total_retrieved": len(parsed_comments)}
+
+
+def tavily_search(query):
+    api_key = os.getenv("TAVILY_API_KEY")
+    if not api_key:
+        print("TAVILY_API_KEY not set, skipping Tavily search")
+        return None
+
+    try:
+        client = TavilyClient(api_key=api_key)
+        response = client.search(
+            query=query,
+            max_results=10,
+            search_depth="advanced",
+            topic="general",
+        )
+
+        organic = []
+        for result in response.get("results", []):
+            organic.append({
+                "title": result.get("title", ""),
+                "url": result.get("url", ""),
+                "description": result.get("content", ""),
+                "score": result.get("score", 0),
+            })
+
+        return {
+            "knowledge": {},
+            "organic": organic,
+        }
+    except Exception as e:
+        print(f"Tavily search failed: {e}")
+        return None
