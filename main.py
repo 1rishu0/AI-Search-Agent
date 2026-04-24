@@ -38,6 +38,8 @@ class State(TypedDict):
     google_analysis: str | None
     bing_analysis: str | None
     reddit_analysis: str | None
+    tavily_results: str | None
+    tavily_analysis: str | None
     final_answer: str | None
 
 
@@ -62,6 +64,15 @@ def bing_search(state: State):
     bing_results = serp_search(query=user_question, engine="bing")
 
     return {"bing_results": bing_results}
+
+
+def tavily_web_search(state: State):
+    user_question = state.get("user_question", "")
+    print(f"Searching Tavily for: {user_question}")
+
+    tavily_results = tavily_search(query=user_question)
+
+    return {"tavily_results": tavily_results}
 
 
 def reddit_search(state: State):
@@ -147,6 +158,21 @@ def analyze_bing_results(state: State):
 
 
 # this function take user_question, reddit results and reddit_post_data from state and with inputting these variable in the get_reddit_analysis_messages function from prompts module to get the messages for invoking the LLM and return its content
+def analyze_tavily_results(state: State):
+    print("Analyzing Tavily search results")
+
+    user_question = state.get("user_question", "")
+    tavily_results = state.get("tavily_results", "")
+
+    if not tavily_results:
+        return {"tavily_analysis": ""}
+
+    messages = get_tavily_analysis_messages(user_question, tavily_results)
+    reply = llm.invoke(messages)
+
+    return {"tavily_analysis": reply.content}
+
+
 def analyze_reddit_results(state: State):
     print("Analyzing reddit search results")
 
@@ -167,8 +193,9 @@ def synthesize_analyses(state: State):
     google_analysis = state.get("google_analysis", "")
     bing_analysis = state.get("bing_analysis", "")
     reddit_analysis = state.get("reddit_analysis", "")
+    tavily_analysis = state.get("tavily_analysis", "")
 
-    messages = get_synthesis_messages(user_question, google_analysis, bing_analysis, reddit_analysis)
+    messages = get_synthesis_messages(user_question, google_analysis, bing_analysis, reddit_analysis, tavily_analysis=tavily_analysis)
     reply = llm.invoke(messages)
     final_answer = reply.content
 
@@ -179,16 +206,19 @@ graph_builder = StateGraph(State)
 
 graph_builder.add_node("google_search", google_search)
 graph_builder.add_node("bing_search", bing_search)
+graph_builder.add_node("tavily_web_search", tavily_web_search)
 graph_builder.add_node("reddit_search", reddit_search)
 graph_builder.add_node("analyze_reddit_posts", analyze_reddit_posts)
 graph_builder.add_node("retrieve_reddit_posts", retrieve_reddit_posts)
 graph_builder.add_node("analyze_google_results", analyze_google_results)
 graph_builder.add_node("analyze_bing_results", analyze_bing_results)
+graph_builder.add_node("analyze_tavily_results", analyze_tavily_results)
 graph_builder.add_node("analyze_reddit_results", analyze_reddit_results)
 graph_builder.add_node("synthesize_analyses", synthesize_analyses)
 
 graph_builder.add_edge(START, "google_search")
 graph_builder.add_edge(START, "bing_search")
+graph_builder.add_edge(START, "tavily_web_search")
 graph_builder.add_edge(START, "reddit_search")
 
 graph_builder.add_edge("google_search", "analyze_reddit_posts")
@@ -201,8 +231,11 @@ graph_builder.add_edge("retrieve_reddit_posts", "analyze_google_results")
 graph_builder.add_edge("retrieve_reddit_posts", "analyze_bing_results")
 graph_builder.add_edge("retrieve_reddit_posts", "analyze_reddit_results")
 
+graph_builder.add_edge("tavily_web_search", "analyze_tavily_results")
+
 graph_builder.add_edge("analyze_google_results", "synthesize_analyses")
 graph_builder.add_edge("analyze_bing_results", "synthesize_analyses")
+graph_builder.add_edge("analyze_tavily_results", "synthesize_analyses")
 graph_builder.add_edge("analyze_reddit_results", "synthesize_analyses")
 
 graph_builder.add_edge("synthesize_analyses", END)
@@ -231,12 +264,14 @@ def run_chatbot():
             "reddit_post_data": None,
             "google_analysis": None,
             "bing_analysis": None,
+            "tavily_results": None,
+            "tavily_analysis": None,
             "reddit_analysis": None,
             "final_answer": None,
         }
 
         print("\nStarting Parallel research process...")
-        print("Launching Google, Bing, and Reddit searches...\n")
+        print("Launching Google, Bing, Tavily, and Reddit searches...\n")
 
         final_state = graph.invoke(state)
 

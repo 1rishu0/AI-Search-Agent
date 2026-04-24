@@ -119,19 +119,45 @@ class PromptTemplates:
 
 
     @staticmethod
+    def tavily_analysis_system() -> str:
+        """System prompt for analyzing Tavily search results."""
+        return """You are an expert research analyst. Analyze the provided Tavily web search results to extract key insights that answer the user's question.
+
+        Focus on:
+        - High-relevance results with strong confidence scores
+        - Factual information from diverse, authoritative sources
+        - Recent and up-to-date information
+        - Unique data points not commonly found in traditional search engines
+
+        Provide a concise analysis highlighting the most relevant findings.
+        """
+
+
+    @staticmethod
+    def tavily_analysis_user(user_question: str, tavily_results: str) -> str:
+        """User prompt for analyzing Tavily search results."""
+        return f"""Question: {user_question}
+
+        Tavily Search Results: {tavily_results}
+
+        Please analyze these Tavily results and extract the key insights that help answer the question.
+        """
+
+
+    @staticmethod
     def synthesis_system() -> str:
         """System prompt for synthesizing all analyses."""
         return """
         You are an expert research synthesizer. Combine the provided analyses from different sources to create a comprehensive, well-structured answer.
         
         Your task:
-        - Synthesize insights from Google, Bing, and Reddit analyses
+        - Synthesize insights from Google, Bing, Tavily, and Reddit analyses
         - Identify common themes and conflicting information
         - Present a balanced view incorporating different perspectives
         - Structure the response logically with clear sections
-        - Cite the source type (Google, Bing, and Reddit) for key claims
+        - Cite the source type (Google, Bing, Tavily, and Reddit) for key claims
         - Highlight any contradictions or uncertainties
-        
+
         Create a comprehensive answer that addresses the user's question from multiple angles.
         """
 
@@ -141,17 +167,19 @@ class PromptTemplates:
                        google_analysis: str,
                        bing_analysis: str,
                        reddit_analysis: str,
+                       tavily_analysis: str = "",
                        ) -> str:
         """User prompt for synthesizing all analyses."""
+        tavily_section = f"\n        Tavily Analysis: {tavily_analysis}" if tavily_analysis else ""
         return f"""
         Question: {user_question}
-        
+
         Google Analysis: {google_analysis}
-        
+
         Bing Analysis: {bing_analysis}
-        
+        {tavily_section}
         Reddit Community Analysis: {reddit_analysis}
-        
+
         Please synthesize these analyses into a comprehensive answer that addresses the question from multiple perspectives.
         """
 
@@ -220,13 +248,25 @@ def get_reddit_analysis_messages(
     )
 
 
+def get_tavily_analysis_messages(
+        user_question: str, tavily_results: str
+) -> list[Dict[str, Any]]:
+    """Get messages for Tavily results analysis."""
+    return create_message_pair(
+        PromptTemplates.tavily_analysis_system(),
+        PromptTemplates.tavily_analysis_user(user_question, tavily_results),
+    )
+
+
 def get_synthesis_messages(
-        user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str
+        user_question: str, google_analysis: str, bing_analysis: str, reddit_analysis: str,
+        tavily_analysis: str = ""
 ) -> list[Dict[str, Any]]:
     """Get messages for final synthesis."""
     return create_message_pair(
         PromptTemplates.synthesis_system(),
         PromptTemplates.synthesis_user(
-            user_question, google_analysis, bing_analysis, reddit_analysis
+            user_question, google_analysis, bing_analysis, reddit_analysis,
+            tavily_analysis=tavily_analysis,
         ),
     )
