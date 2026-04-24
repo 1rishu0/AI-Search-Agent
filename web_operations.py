@@ -188,6 +188,7 @@ def tavily_reddit_search(query, max_results=10):
             parsed_post = {
                 "title": result.get("title"),
                 "url": result.get("url"),
+                "content": result.get("content", ""),
             }
             parsed_data.append(parsed_post)
 

@@ -177,6 +177,9 @@ def analyze_tavily_reddit_results(state: State):
     user_question = state.get("user_question", "")
     tavily_reddit_results = state.get("tavily_reddit_results", "")
 
+    if not tavily_reddit_results:
+        return {"tavily_reddit_analysis": ""}
+
     messages = get_tavily_reddit_analysis_messages(user_question, str(tavily_reddit_results))
     reply = llm.invoke(messages)
 
